@@ -46,12 +46,14 @@
                     placeholder="请输入密码"
                     :rules="[{ required: true, message: '请填写密码' }]"
                 />
-                <van-field
-                    v-model="currentUser.role"
-                    name="角色"
-                    label="角色"
-                    placeholder="请填写角色 (如 admin, user)"
-                />
+                <van-field name="role" label="角色">
+                  <template #input>
+                    <van-radio-group v-model="currentUser.role" direction="horizontal">
+                      <van-radio name="ADMIN">ADMIN</van-radio>
+                      <van-radio name="USER">USER</van-radio>
+                    </van-radio-group>
+                  </template>
+                </van-field>
             </van-cell-group>
         </van-form>
     </van-dialog>
@@ -76,7 +78,7 @@ const currentUser = reactive({
     id: '',
     username: '',
     password: '',
-    role: 'user'
+    role: 'USER'
 });
 
 const onClickLeft = () => {
@@ -168,7 +170,7 @@ const onConfirmUser = async () => {
         currentUser.id = '';
         currentUser.username = '';
         currentUser.password = '';
-        currentUser.role = 'user';
+        currentUser.role = 'USER';
         isEdit.value = false;
         
         onSearch(); // 刷新列表

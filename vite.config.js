@@ -14,7 +14,13 @@ export default defineConfig({
   // 开发服务器配置（调试用）
   server: {
     port: 5173, // 启动端口
-    host: '0.0.0.0' // 允许局域网访问（手机调试用）
+    host: '0.0.0.0', // 允许局域网访问（手机调试用）
+    proxy: {
+      '/api': {
+        target: 'http://110.40.159.92:8080',
+        changeOrigin: true
+      }
+    }
   },
   // 打包配置（适配App WebView）
   build: {

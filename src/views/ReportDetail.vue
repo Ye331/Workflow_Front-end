@@ -402,6 +402,7 @@ const handleAsk = async () => {
     align-items: center;
     gap: 6px;
     font-weight: 600;
+    font-size: 14px;
     color: #333;
 }
 .qa-status {

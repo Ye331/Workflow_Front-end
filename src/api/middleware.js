@@ -2,7 +2,7 @@ import { request } from '@/utils/request'
 import mockApi from './mock'
 
 // 开关：是否使用模拟数据（在开发阶段未对接后端时开启）
-const USE_MOCK = true
+const USE_MOCK = false
 
 /**
  * 中台调度层接口 (Python Middleware)
@@ -85,9 +85,35 @@ export default {
      */
     createTask(data) {
         if (USE_MOCK) return mockApi.createTask(data)
+
+        // Transform data for backend
+        const now = new Date();
+        let startTime = new Date();
+
+        if (data.time_range === '7d') {
+            startTime.setDate(now.getDate() - 7);
+        } else if (data.time_range === '30d') {
+            startTime.setDate(now.getDate() - 30);
+        } else {
+            // Default 24h
+            startTime.setHours(now.getHours() - 24);
+        }
+
+        const format = (d) => {
+            const pad = (n) => n.toString().padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+
+        const payload = {
+            keywords: data.keywords,
+            startTime: format(startTime),
+            endTime: format(now),
+            interval: 60 // Default fixed for now, or map data.interval '1h' -> 60
+        }
+
         return request('/task/create', {
             method: 'POST',
-            data
+            data: payload
         })
     },
 

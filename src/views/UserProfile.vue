@@ -70,7 +70,7 @@ const userId = ref('');
 const userRole = ref('');
 
 const isAdmin = computed(() => {
-  return userRole.value === 'Admin' || userRole.value === 'admin';
+  return userRole.value === 'ADMIN';
 });
 
 onMounted(() => {
@@ -78,7 +78,7 @@ onMounted(() => {
   userName.value = localStorage.getItem('userName') || 'Guest';
   userId.value = localStorage.getItem('userId') || '-';
   // Check both keys due to potential inconsistency
-  userRole.value = localStorage.getItem('userRole') || localStorage.getItem('role') || 'User';
+  userRole.value = localStorage.getItem('userRole') || localStorage.getItem('role') || 'USER';
 });
 
 const handleLogout = () => {

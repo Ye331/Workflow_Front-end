@@ -10,26 +10,39 @@
             v-model="username"
             name="username"
             label="用户名"
-            placeholder="用户名 (admin/user1)"
+            placeholder="用户名"
             :rules="[{ required: true, message: '请填写用户名' }]"
+          />
+          <van-field
+            v-if="isRegister"
+            v-model="email"
+            name="email"
+            label="邮箱"
+            placeholder="请输入邮箱"
+            :rules="[{ required: false }]"
           />
           <van-field
             v-model="password"
             type="password"
             name="password"
             label="密码"
-            placeholder="密码 (默认123456)"
+            placeholder="密码"
             :rules="[{ required: true, message: '请填写密码' }]"
           />
         </van-cell-group>
         <div style="margin: 24px 16px;">
           <van-button round block type="primary" native-type="submit" :loading="loading">
-            登录
+            {{ isRegister ? '注册' : '登录' }}
           </van-button>
+        </div>
+        <div class="toggle-box">
+          <span class="toggle-text" @click="isRegister = !isRegister">
+            {{ isRegister ? '已有账号？立即登录' : '没有账号？立即注册' }}
+          </span>
         </div>
       </van-form>
       
-      <div class="tips">
+      <div class="tips" v-if="!isRegister">
         <p>测试账号: admin / 123456</p>
         <p>普通账号: user1 / 123456</p>
       </div>
@@ -46,22 +59,37 @@ import middleware from '@/api/middleware';
 const router = useRouter();
 const username = ref('');
 const password = ref('');
+const email = ref('');
 const loading = ref(false);
+const isRegister = ref(false);
 
 const onSubmit = async (values) => {
   loading.value = true;
   try {
-    const res = await middleware.login(values);
-    // 登录成功，存储信息
-    localStorage.setItem('token', res.token);
-    localStorage.setItem('userId', res.id);
-    localStorage.setItem('userName', res.username);
-    localStorage.setItem('userRole', res.role);
-    
-    showToast('登录成功');
-    router.replace('/dashboard');
+    if (isRegister.value) {
+      // 注册逻辑
+      await middleware.addUser({
+        username: values.username,
+        password: values.password,
+        email: values.email,
+        role: 'USER'
+      });
+      showToast('注册成功，请直接登录');
+      isRegister.value = false;
+    } else {
+      // 登录逻辑
+      const res = await middleware.login(values);
+      // 登录成功，存储信息
+      localStorage.setItem('token', res.token);
+      localStorage.setItem('userId', res.id);
+      localStorage.setItem('userName', res.username);
+      localStorage.setItem('userRole', res.role);
+      
+      showToast('登录成功');
+      router.replace('/dashboard');
+    }
   } catch (error) {
-    showToast(error.message || '登录失败');
+    showToast((isRegister.value ? '注册失败: ' : '登录失败: ') + (error.message || '网络错误'));
   } finally {
     loading.value = false;
   }
@@ -69,6 +97,15 @@ const onSubmit = async (values) => {
 </script>
 
 <style scoped>
+.toggle-box {
+  text-align: center;
+  margin-bottom: 15px;
+}
+.toggle-text {
+  color: #1989fa;
+  font-size: 14px;
+  cursor: pointer;
+}
 .login-page {
   height: 100vh;
   display: flex;

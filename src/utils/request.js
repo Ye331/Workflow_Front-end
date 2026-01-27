@@ -23,7 +23,7 @@ export const request = async (url, options = {}) => {
             headers: {
                 'Content-Type': 'application/json',
                 // 预留Token：从本地存储获取（App WebView兼容）
-                Authorization: localStorage.getItem('token') || '',
+                Authorization: localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
                 ...header
             },
             timeout: 10000 // 适配App网络超时

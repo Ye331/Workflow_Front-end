@@ -1,8 +1,7 @@
 // 模拟数据
 const users = [
-    { id: '1', username: 'admin', email: 'admin@example.com', role: 'admin', status: 'active' },
-    { id: '2', username: 'user1', email: 'user1@example.com', role: 'user', status: 'active' },
-    { id: '3', username: 'editor', email: 'editor@example.com', role: 'editor', status: 'inactive' }
+    { id: '1', username: 'admin', email: 'admin@example.com', role: 'ADMIN', status: 'active' },
+    { id: '2', username: 'user1', email: 'user1@example.com', role: 'USER', status: 'active' }
 ]
 
 const tasks = [
@@ -79,7 +78,7 @@ export default {
             id: Date.now().toString(),
             username: data.username,
             email: data.email || '',
-            role: data.role || 'user',
+            role: data.role || 'USER',
             status: 'active'
         }
         users.push(newUser)

@@ -1,7 +1,7 @@
 <template>
   <div class="tiimo-dashboard">
     <!-- Header -->
-    <header class="header" :class="{ 'header-scrolled': isScrolled }">
+    <header class="header" :class="{ 'header-scrolled': isScrolled }" v-if="activeTab !== 'mine'">
       <div class="header-left">
         <div class="status-pill" @click="goToUserCenter">
           <van-icon name="user-circle-o" />
@@ -29,14 +29,14 @@
       <div class="widget-card purple">
         <div class="widget-icon-circle"><van-icon name="fire-o" size="24" /></div>
         <div class="widget-text">
-           <div class="stat-num">5</div>
+           <div class="stat-num">{{ monitoringCount }}</div>
            <div class="stat-label">正在监测</div>
         </div>
       </div>
       <div class="widget-card blue">
         <div class="widget-icon-circle"><van-icon name="chart-trending-o" size="24" /></div>
         <div class="widget-text">
-            <div class="stat-num">12</div>
+            <div class="stat-num">{{ todayReportCount }}</div>
             <div class="stat-label">今日报告</div>
         </div>
       </div>
@@ -157,9 +157,9 @@
       fixed
       safe-area-inset-bottom
     >
-      <van-tabbar-item icon="apps-o" name="overview">概览</van-tabbar-item>
-      <van-tabbar-item icon="search" name="monitor">监测</van-tabbar-item>
-      <van-tabbar-item icon="comment-o" badge="5" name="msg">消息</van-tabbar-item>
+      <van-tabbar-item icon="apps-o" name="overview" @click="scrollToTop">概览</van-tabbar-item>
+      <van-tabbar-item icon="search" name="monitor" @click="scrollToTop">监测</van-tabbar-item>
+      <van-tabbar-item icon="comment-o" :badge="unreadCount || null" name="msg">消息</van-tabbar-item>
       <van-tabbar-item icon="user-o" name="mine" @click="goToUserCenter">我的</van-tabbar-item>
     </van-tabbar>
   </div>
@@ -177,6 +177,16 @@ const router = useRouter()
 // UI States
 const activeNames = ref(['monitor', 'reports'])
 const activeTab = ref('overview')
+const monitoringCount = ref(0)
+const todayReportCount = ref(0)
+const unreadCount = ref(5) // 模拟未读消息数
+
+// 监听 Tab 切换，点击消息页时清空未读数
+watch(activeTab, (val) => {
+  if (val === 'msg') {
+    unreadCount.value = 0
+  }
+})
 const isScrolled = ref(false)
 
 const handleScroll = () => {
@@ -307,13 +317,53 @@ const goToReport = (id) => {
   router.push(`/report/${id}`)
 }
 
+const scrollToTop = () => {
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth',
+  })
+}
+
 const goToUserCenter = () => {
     activeTab.value = 'mine'
+}
+
+const fetchDashboardStats = async () => {
+    const userId = localStorage.getItem('userId') || '1'
+    
+    // 1. Fetch Tasks for "Currently Monitoring"
+    try {
+        const taskRes = await middlewareApi.getTaskList({ userId, page: 1, size: 100 })
+        if (taskRes && taskRes.total !== undefined) {
+             monitoringCount.value = taskRes.total
+        } else if (taskRes && taskRes.list) {
+             monitoringCount.value = taskRes.list.length
+        }
+    } catch (e) {
+        console.error("Failed to fetch task stats", e)
+    }
+
+    // 2. Fetch Reports for "Today's Report"
+    try {
+        const reportRes = await middlewareApi.getReportList({ userId, page: 1, size: 100 })
+        if (reportRes && reportRes.list) {
+            const today = new Date().toDateString()
+            const todayCount = reportRes.list.filter(item => {
+                if (!item.createTime) return false
+                const itemDate = new Date(item.createTime).toDateString()
+                return itemDate === today
+            }).length
+            todayReportCount.value = todayCount
+        }
+    } catch (e) {
+        console.error("Failed to fetch report stats", e)
+    }
 }
 
 onMounted(() => {
     window.addEventListener('scroll', handleScroll)
     initObserver()
+    fetchDashboardStats()
 })
 </script>
 
@@ -346,18 +396,22 @@ onMounted(() => {
   margin-bottom: 24px; /* Ensure margin stays consistent */
 }
 .status-pill {
-  background-color: #f5f5f5;
-  padding: 6px 12px;
-  border-radius: 20px;
+  background-color: #ffffff;
+  padding: 6px 8px;
+  border-radius: 24px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
   transition: all 0.3s ease;
   opacity: 1;
   transform: translateX(0);
+}
+
+.status-pill :deep(.van-icon) {
+  font-size: 22px;
 }
 
 .header.header-scrolled .status-pill {
