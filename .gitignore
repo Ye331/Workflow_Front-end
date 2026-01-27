@@ -39,3 +39,6 @@ ios/App/App/public/
 ios/App/Podfile.lock
 ios/App/Pods/
 
+API_DESIGN.md 
+input.md
+output.md

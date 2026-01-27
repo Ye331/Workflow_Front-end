@@ -87,17 +87,26 @@ const onLoad = async () => {
     // 模拟分页或一次性加载
     loading.value = true;
     try {
-        const res = await middleware.getUserList({ keyword: searchText.value });
-        // 假设res是数组
-        if (Array.isArray(res)) {
-            // 如果是第一页，覆盖
-             if (list.value.length === 0 || searchText.value) {
-                 list.value = res;
-             } else {
-                 list.value.push(...res);
-             }
+        const res = await middleware.getUserList({ 
+            page: 1, 
+            size: 100 // Load all for now or implement pagination
+        });
+        
+        const dataList = res.list || [];
+        
+        // 如果是搜索（这里前端搜索，因为API不支持搜索）
+        let filteredList = dataList;
+        if (searchText.value) {
+            filteredList = dataList.filter(u => u.username.includes(searchText.value));
         }
-        finished.value = true; // 简单处理，假设一次加载完
+
+        if (list.value.length === 0 || searchText.value) {
+             list.value = filteredList;
+        } else {
+             // list.value.push(...filteredList); // Avoid duplicating if simplified
+             list.value = filteredList;
+        }
+        finished.value = true; 
     } catch (error) {
         console.error(error);
         finished.value = true;

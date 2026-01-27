@@ -1,188 +1,500 @@
 <template>
-  <div class="dashboard-page">
-    <van-nav-bar title="舆情监控看板">
-      <template #right>
-        <van-icon name="user-o" size="18" @click="goToUserCenter" />
-      </template>
-    </van-nav-bar>
+  <div class="tiimo-dashboard">
+    <!-- Header -->
+    <header class="header" :class="{ 'header-scrolled': isScrolled }">
+      <div class="header-left">
+        <div class="status-pill" @click="goToUserCenter">
+          <van-icon name="user-circle-o" />
+          <span>{{ currentRole }}</span>
+        </div>
+      </div>
+      <div class="header-center">
+        <div class="date-display">
+          <div class="date-text">
+            <div class="weekday">舆情看板</div>
+            <div class="full-date">{{ currentDateStr }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="header-right">
+        <van-icon name="ellipsis" size="24" @click="goToUserCenter" />
+      </div>
+    </header>
 
-    <van-action-sheet
-      v-model:show="showUserAction"
-      :actions="userActions"
-      cancel-text="取消"
-      close-on-click-action
-      @select="onUserActionSelect"
-    />
+    <!-- User Profile Section -->
+    <UserProfile v-if="activeTab === 'mine'" />
 
-    <!-- WF1: 舆情分析流触发 -->
-    <div class="card search-card">
-      <h3 class="card-title">新词监测 (Analysis Flow)</h3>
-      <van-field v-model="keyword" placeholder="输入关键词 (如: 计算机)" label="关键词" />
-      <van-field
-        v-model="timeRange"
-        is-link
-        readonly
-        name="picker"
-        label="时间范围"
-        placeholder="选择时间范围"
-        @click="showPicker = true"
-      />
-      <van-popup v-model:show="showPicker" position="bottom">
+    <!-- Widget Cards (Stats) -->
+    <div class="widget-scroll-container" v-if="activeTab === 'overview'">
+      <div class="widget-card purple">
+        <div class="widget-icon-circle"><van-icon name="fire-o" size="24" /></div>
+        <div class="widget-text">
+           <div class="stat-num">5</div>
+           <div class="stat-label">正在监测</div>
+        </div>
+      </div>
+      <div class="widget-card blue">
+        <div class="widget-icon-circle"><van-icon name="chart-trending-o" size="24" /></div>
+        <div class="widget-text">
+            <div class="stat-num">12</div>
+            <div class="stat-label">今日报告</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Sections -->
+    <div class="task-sections">
+      <!-- Tab 1: Monitor (Analysis Flow) -->
+      <div v-show="activeTab === 'monitor'">
+          <div class="section-header mb-3">
+              <van-icon name="aim" class="mr-2" />
+              <span class="section-title">新词监测 (Analysis)</span>
+          </div>
+          
+          <div class="custom-card-content">
+             <van-cell-group inset :border="false" style="margin:0; padding:0;">
+                <van-field 
+                    v-model="keyword" 
+                    placeholder="输入关键词 (如: 计算机)" 
+                    label="关键词" 
+                    left-icon="search"
+                    class="custom-field"
+                />
+                <van-field
+                    v-model="timeDisplayName"
+                    is-link
+                    readonly
+                    name="picker"
+                    label="时间范围"
+                    left-icon="clock-o"
+                    placeholder="选择时间范围"
+                    @click="showPicker = true"
+                    class="custom-field"
+                />
+             </van-cell-group>
+             <van-button 
+                type="primary" 
+                block 
+                color="#000"
+                class="mt-3 action-btn" 
+                :loading="loading" 
+                @click="handleTriggerAnalysis"
+             >
+                <van-icon name="play-circle-o" class="mr-1" /> 开始感知
+             </van-button>
+          </div>
+      </div>
+
+      <!-- Tab 1 (Overview) & Tab 2 (Reports): Report List -->
+      <div v-show="activeTab === 'overview' || activeTab === 'monitor'">
+          <div v-if="activeTab !== 'monitor'" class="section-header mb-3 mt-4">
+              <van-icon name="orders-o" class="mr-2" />
+              <span class="section-title">趋势报告 (Reports)</span>
+              <span class="count-badge">({{ list.length }})</span>
+          </div>
+          <div v-if="activeTab === 'monitor'" class="section-header mb-3 mt-4">
+               <van-icon name="clock-o" class="mr-2" />
+               <span class="section-title">近期记录</span>
+          </div>
+          
+          <div class="report-list-container">
+             <van-list
+                v-model:loading="listLoading"
+                :finished="finished"
+                finished-text="没有更多了"
+                @load="onLoad"
+             >
+                <!-- Custom List Item Style -->
+                <div 
+                    v-for="item in list"
+                    :key="item.id"
+                    class="report-item"
+                    @click="goToReport(item.id)"
+                >
+                   <div class="report-icon">
+                      <van-icon 
+                        :name="item.sentiment === 'negative' ? 'warn-o' : (item.sentiment === 'positive' ? 'smile-o' : 'info-o')" 
+                        :color="item.sentiment === 'negative' ? '#ff605e' : (item.sentiment === 'positive' ? '#4caf50' : '#1989fa')" 
+                        size="24" 
+                      />
+                   </div>
+                   <div class="report-info">
+                      <div class="report-title">{{ item.title }}</div>
+                      <div class="report-meta">
+                        热度: {{ item.heat }} % | 状态: {{ item.status }}
+                      </div>
+                   </div>
+                   <div class="report-arrow">
+                      <van-icon name="arrow" color="#ccc" />
+                   </div>
+                </div>
+            </van-list>
+          </div>
+      </div>
+
+      <!-- Tab 3: Empty Placeholder -->
+      <div v-if="activeTab === 'msg'" class="empty-placeholder">
+          <van-empty description="暂无新消息" />
+      </div>
+    </div>
+
+    <!-- Popups -->
+    <van-popup v-model:show="showPicker" position="bottom" round>
         <van-picker
           :columns="timeOptions"
           @confirm="onConfirmTime"
           @cancel="showPicker = false"
         />
-      </van-popup>
-      <van-button type="primary" block class="mt-2" :loading="loading" @click="handleTriggerAnalysis">
-        开始感知
-      </van-button>
-    </div>
+    </van-popup>
 
-    <!-- 报告列表 (模拟从中台获取的Data Slices) -->
-    <div class="card list-card">
-      <h3 class="card-title"> 趋势报告 (Data Slices)</h3>
-      <van-list
-        v-model:loading="listLoading"
-        :finished="finished"
-        finished-text="没有更多了"
-        @load="onLoad"
-      >
-        <van-cell
-          v-for="item in list"
-          :key="item.id"
-          :title="item.title"
-          :label="`热度: ${item.heat} | 情感: ${item.sentiment}`"
-          is-link
-          @click="goToReport(item.id)"
-        >
-          <template #value>
-            <span :class="{'text-red': item.sentiment < 5, 'text-green': item.sentiment >= 5}">
-              {{ item.sentiment < 5 ? '风险' : '积极' }}
-            </span>
-          </template>
-        </van-cell>
-      </van-list>
-    </div>
+    <!-- Bottom Tabbar -->
+    <van-tabbar v-model="activeTab" active-color="#000" inactive-color="#999" :border="false" class="custom-tabbar" fixed placeholder>
+      <van-tabbar-item icon="apps-o" name="overview">概览</van-tabbar-item>
+      <van-tabbar-item icon="search" name="monitor">监测</van-tabbar-item>
+      <van-tabbar-item icon="comment-o" badge="5" name="msg">消息</van-tabbar-item>
+      <van-tabbar-item icon="user-o" name="mine" @click="goToUserCenter">我的</van-tabbar-item>
+    </van-tabbar>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import middlewareApi from '@/api/middleware'
+import UserProfile from './UserProfile.vue'
 
 const router = useRouter()
 
-// 状态
+// UI States
+const activeNames = ref(['monitor', 'reports'])
+const activeTab = ref('monitor')
+const isScrolled = ref(false)
+
+const handleScroll = () => {
+    isScrolled.value = window.scrollY > 20
+}
+
+onMounted(() => {
+    window.addEventListener('scroll', handleScroll)
+})
+
+onUnmounted(() => {
+    window.removeEventListener('scroll', handleScroll)
+    if (itemObserver) itemObserver.disconnect()
+})
+
+// Scroll Reveal Logic
+let itemObserver = null
+
+const initObserver = () => {
+    itemObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                entry.target.classList.remove('report-item-hidden')
+            } else {
+                entry.target.classList.add('report-item-hidden')
+            }
+        })
+    }, { threshold: 0.1, rootMargin: '0px' })
+}
+
+
+const getFormattedDate = () => {
+  const date = new Date()
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+  const weekDay = weekDays[date.getDay()]
+  return `${year}年${month}月${day}日 ${weekDay}`
+}
+
+const currentDateStr = ref(getFormattedDate())
+const currentRole = ref('Admin')
+
+// Business States
 const keyword = ref('')
 const timeRange = ref('24h')
+const timeDisplayName = ref('最近24小时')
 const showPicker = ref(false)
 const loading = ref(false)
 const listLoading = ref(false)
 const finished = ref(false)
 const list = ref([])
-const showUserAction = ref(false)
 
-const userActions = [
-  { name: '用户管理', key: 'manage' },
-  { name: '退出登录', key: 'logout', color: '#ee0a24' }
-]
+watch(list, () => {
+    nextTick(() => {
+        const items = document.querySelectorAll('.report-item:not(.observed)')
+        items.forEach((item) => {
+            // Initial hidden state for animation
+            item.classList.add('report-item-hidden')
+            
+            if (itemObserver) {
+                itemObserver.observe(item)
+                item.classList.add('observed')
+            }
+        })
+    })
+}, { deep: true })
 
-const goToUserCenter = () => {
-    showUserAction.value = true
-}
-
-const onUserActionSelect = (item) => {
-    if (item.key === 'manage') {
-        router.push('/user-management')
-    } else if (item.key === 'logout') {
-        localStorage.clear()
-        router.replace('/login')
-    }
-}
-
-// 选项
 const timeOptions = [
   { text: '最近24小时', value: '24h' },
   { text: '最近7天', value: '7d' },
   { text: '最近30天', value: '30d' },
 ]
 
+// Methods
 const onConfirmTime = ({ selectedOptions }) => {
   timeRange.value = selectedOptions[0].value
+  timeDisplayName.value = selectedOptions[0].text
   showPicker.value = false
 }
 
-// 触发 WF1
 const handleTriggerAnalysis = async () => {
   if (!keyword.value) return showToast('请输入关键词')
   
   loading.value = true
   try {
-    // 调用中台 API
-    await middlewareApi.triggerAnalysis({
-      keyword: keyword.value,
-      time_range: timeRange.value
+    await middlewareApi.createTask({
+      userId: localStorage.getItem('userId') || '1',
+      keywords: [keyword.value],
+      time_range: timeRange.value,
+      interval: '1h'
     })
     showToast({ type: 'success', message: '任务已下发' })
-    // 模拟刷新列表
+    list.value = []
+    finished.value = false
+    listLoading.value = true
     onLoad()
   } catch (err) {
-    showToast('任务触发失败')
+    showToast('任务触发失败: ' + (err.message || '未知错误'))
   } finally {
     loading.value = false
   }
 }
 
-// 获取列表 (模拟)
 const onLoad = async () => {
-  // 模拟数据加载
-  setTimeout(() => {
-    if (list.value.length === 0) {
-      list.value = [
-        { id: 1, title: '极氪001 电池续航测评', heat: 8500, sentiment: 8.2 },
-        { id: 2, title: '某品牌刹车失灵事件', heat: 12000, sentiment: 2.1 },
-        { id: 3, title: '2026年新能源补贴政策', heat: 5000, sentiment: 6.5 },
-      ]
+  try {
+    const res = await middlewareApi.getAnalysisSlices({
+        userId: localStorage.getItem('userId') || '1',
+        page: 1, 
+        size: 20
+    })
+    if (res && res.list) {
+        // Mock data enhancement if needed
+        list.value = res.list
+    } else {
+        list.value = []
     }
+  } catch (err) {
+    // showToast('数据加载失败')
+  } finally {
     listLoading.value = false
     finished.value = true
-  }, 1000)
+  }
 }
 
 const goToReport = (id) => {
   router.push(`/report/${id}`)
 }
 
-const goToUserManagement = () => {
-  router.push('/user-management')
+const goToUserCenter = () => {
+    activeTab.value = 'mine'
 }
+
+onMounted(() => {
+    window.addEventListener('scroll', handleScroll)
+    initObserver()
+    const role = localStorage.getItem('role')
+    if (role) currentRole.value = role.charAt(0).toUpperCase() + role.slice(1)
+})
 </script>
 
 <style scoped>
-.dashboard-page {
+.tiimo-dashboard {
+  padding: 24px 20px 0 20px;
+  background-color: #f8f9fa; /* Slightly off-white background for better spacing perception */
   min-height: 100vh;
-  background: #f7f8fa;
-  padding-bottom: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Segoe UI, Arial, Roboto, 'PingFang SC', 'miui', 'Hiragino Sans GB', 'Microsoft Yahei', sans-serif;
 }
-.card {
-  background: #fff;
-  margin: 12px;
-  padding: 16px;
-  border-radius: 8px;
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: transparent; /* Initial Solid Background */
+  padding: 10px 0; /* Initial Padding */
+  transition: all 0.3s ease-in-out;
 }
-.card-title {
-  font-size: 16px;
-  font-weight: bold;
-  margin-bottom: 12px;
-  border-left: 4px solid #1989fa;
-  padding-left: 8px;
+
+.header.header-scrolled {
+  padding: 5px 0; /* Narrower */
+  background-color: rgba(255, 255, 255, 0.8); /* Transparent */
+  backdrop-filter: blur(10px);
+  margin-bottom: 24px; /* Ensure margin stays consistent */
 }
-.mt-2 {
-  margin-top: 16px;
+.status-pill {
+  background-color: #f5f5f5;
+  padding: 6px 12px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  transition: all 0.3s ease;
+  opacity: 1;
+  transform: translateX(0);
 }
-.text-red { color: #ee0a24; }
-.text-green { color: #07c160; }
+
+.header.header-scrolled .status-pill {
+  opacity: 0;
+  transform: translateX(-20px);
+  pointer-events: none;
+}
+
+.header-center { 
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center; 
+}
+.date-text { display: flex; flex-direction: column; align-items: center; }
+.weekday { 
+    font-size: 18px; 
+    font-weight: bold; 
+    color: #000; 
+    transition: all 0.3s ease;
+    max-height: 30px;
+    opacity: 1;
+}
+.header.header-scrolled .weekday {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    transform: translateY(-10px);
+}
+.full-date { font-size: 12px; color: #666; margin-top: 2px; }
+.ml-2 { margin-left: 16px; }
+
+/* Widgets */
+.widget-scroll-container {
+  display: flex;
+  overflow-x: auto;
+  gap: 16px;
+  padding-bottom: 24px;
+  -ms-overflow-style: none; scrollbar-width: none;
+}
+.widget-scroll-container::-webkit-scrollbar { display: none; }
+
+.widget-card {
+  flex: 1;
+  min-width: 45%; 
+  height: 130px;
+  border-radius: 24px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  box-sizing: border-box;
+}
+.widget-card.purple { background-color: #F3E5F5; }
+.widget-card.yellow { background-color: #F0F4C3; }
+.widget-card.blue { background-color: #E3F2FD; }
+
+.widget-icon-circle {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.4);
+  display: flex; justify-content: center; align-items: center;
+  margin-bottom: 12px; color: #333;
+}
+.stat-num { font-size: 28px; font-weight: 700; line-height: 1.2; }
+.text-risk { color: #d32f2f; }
+.stat-label { font-size: 13px; color: #666; margin-top: 4px; }
+
+/* Sections */
+.task-sections { margin-top: 24px; padding-bottom: 90px;}
+.section-header {
+  display: flex; align-items: center;
+  font-size: 18px; font-weight: 600; color: #333; width: 100%;
+  margin-bottom: 16px;
+}
+.section-title { margin-right: 4px; }
+.count-badge { color: #999; font-weight: normal; font-size: 14px; }
+.mr-2 { margin-right: 8px; }
+
+/* Custom Vant Overrides */
+:deep(.van-cell) { padding-left: 0; padding-right: 0; background: transparent; }
+:deep(.van-collapse-item__content) { padding: 0 0 16px 0; background: transparent; }
+
+/* Custom Card inside Collapse */
+.custom-card-content {
+    background: #fff;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+}
+.custom-field {
+    background: #f7f8fa;
+    border-radius: 16px;
+    margin-bottom: 16px;
+    padding: 16px 20px;
+}
+.action-btn {
+    border-radius: 16px;
+    font-weight: 600;
+    height: 48px;
+    font-size: 16px;
+}
+
+/* List Items */
+.report-item {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    
+    /* Reveal Animation Base State */
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s, box-shadow 0.2s;
+}
+
+/* Hidden state added by JS */
+.report-item-hidden {
+    opacity: 0;
+    transform: translateY(40px);
+}
+
+.report-item:active { background: #f5f5f5; }
+.report-icon {
+    width: 48px; height: 48px;
+    background: #f7f8fa;
+    border-radius: 16px;
+    display: flex; justify-content: center; align-items: center;
+    margin-right: 16px;
+}
+.report-info { flex: 1; }
+.report-title { font-weight: 600; font-size: 16px; margin-bottom: 6px; color: #333; }
+.report-meta { font-size: 13px; color: #999; }
+.report-arrow { margin-left: 8px;}
+
+/* Tabbar */
+.custom-tabbar {
+  /* box-shadow: 0 -2px 10px rgba(0,0,0,0.05); */
+}
 </style>

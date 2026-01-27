@@ -9,78 +9,9 @@ const USE_MOCK = true
  * 对应架构中的核心业务流程
  */
 export default {
-    // ==========================================
-    // WF1: 舆情分析流 (Analysis Flow)
-    // ==========================================
-
-    /**
-     * 触发舆情分析
-     * @param {Object} data
-     * @param {String} data.keyword 关键词
-     * @param {String} data.time_range 时间范围 (e.g., '24h', '7d')
-     * @returns {Promise} 返回任务ID或初步切片信息
-     */
-    triggerAnalysis(data) {
-        if (USE_MOCK) return mockApi.triggerAnalysis(data)
-        return request('/analysis/trigger', {
-            method: 'POST',
-            data
-        })
-    },
-
-    /**
-     * 获取数据切片列表 (供 widget 轮询或首页展示)
-     */
-    getDataSlices() {
-        return request('/analysis/slices', {
-            method: 'GET'
-        })
-    },
 
     // ==========================================
-    // WF2: 报告生成流 (Report Generation Flow)
-    // ==========================================
-
-    /**
-     * 获取完整报告详情
-     * @param {String} id 报告ID
-     * @returns {Promise} 返回 Report JSON (包含图表配置、Markdown文本)
-     */
-    getReportDetail(id) {
-        return request(`/report/${id}`, {
-            method: 'GET'
-        })
-    },
-
-    /**
-     * (可选) 强制重新生成报告
-     * 触发 Coze Agent 重新执行 Trend & Summary
-     */
-    regenerateReport(id) {
-        return request(`/report/${id}/regenerate`, {
-            method: 'POST'
-        })
-    },
-
-    // ==========================================
-    // WF3: 智能问答流 (Q&A Flow)
-    // ==========================================
-
-    /**
-     * 提问
-     * @param {Object} data
-     * @param {String} data.question 问题内容
-     * @param {String} data.context_id 当前报告ID (作为 Context 上下文索引)
-     */
-    askQuestion(data) {
-        return request('/qa/ask', {
-            method: 'POST',
-            data
-        })
-    },
-
-    // ==========================================
-    // WF4: 用户管理 (User Management)
+    // 2.1 用户管理 (User Management)
     // ==========================================
 
     /**
@@ -97,6 +28,7 @@ export default {
 
     /**
      * 获取用户列表
+     * @param {Object} params { userId, page, size }
      */
     getUserList(params) {
         if (USE_MOCK) return mockApi.getUserList(params)
@@ -108,7 +40,7 @@ export default {
 
     /**
      * 添加/注册用户
-     * @param {Object} data { username, password, role }
+     * @param {Object} data { username, password, email, role }
      */
     addUser(data) {
         if (USE_MOCK) return mockApi.addUser(data)
@@ -121,7 +53,7 @@ export default {
     /**
      * 更新用户信息
      * @param {String} id 用户ID
-     * @param {Object} data 更新内容
+     * @param {Object} data 更新内容 { username, email, role }
      */
     updateUser(id, data) {
         if (USE_MOCK) return mockApi.updateUser(id, data)
@@ -140,6 +72,165 @@ export default {
         return request('/user/delete', {
             method: 'POST',
             data: { id }
+        })
+    },
+
+    // ==========================================
+    // 2.2 监测任务管理 (Task Management)
+    // ==========================================
+
+    /**
+     * 创建新的监测任务
+     * @param {Object} data { userId, keywords, time_range, interval }
+     */
+    createTask(data) {
+        if (USE_MOCK) return mockApi.createTask(data)
+        return request('/task/create', {
+            method: 'POST',
+            data
+        })
+    },
+
+    /**
+     * 获取监测任务列表
+     * @param {Object} params { userId, page, size }
+     */
+    getTaskList(params) {
+        if (USE_MOCK) return mockApi.getTaskList(params)
+        return request('/task/list', {
+            method: 'GET',
+            data: params
+        })
+    },
+
+    /**
+     * 更新指定任务的配置
+     * @param {String} taskId 任务ID
+     * @param {Object} data { keywords, time_range, interval }
+     */
+    updateTask(taskId, data) {
+        if (USE_MOCK) return mockApi.updateTask(taskId, data)
+        return request(`/task/${taskId}/update`, {
+            method: 'POST',
+            data
+        })
+    },
+
+    /**
+     * 启停指定监测任务
+     * @param {String} taskId 任务ID
+     * @param {Boolean} enable true/false
+     */
+    switchTask(taskId, enable) {
+        if (USE_MOCK) return mockApi.switchTask(taskId, enable)
+        return request(`/task/${taskId}/switch`, {
+            method: 'POST',
+            data: { enable }
+        })
+    },
+
+    /**
+     * 删除监测任务
+     * @param {String} taskId
+     */
+    deleteTask(taskId) {
+        if (USE_MOCK) return mockApi.deleteTask(taskId)
+        return request(`/task/${taskId}/delete`, {
+            method: 'POST'
+        })
+    },
+
+    /**
+     * 获取指定任务下的切片(事件)
+     * @param {Object} params { taskId, userId, page, size }
+     */
+    getAnalysisSlices(params) {
+        if (USE_MOCK) return mockApi.getAnalysisSlices(params)
+        return request('/analysis/slices', {
+            method: 'GET',
+            data: params
+        })
+    },
+
+    // ==========================================
+    // 2.3 资讯数据 (News / Record)
+    // ==========================================
+
+    /**
+     * 获取资讯列表
+     * @param {Object} params { eventId, taskId, userId, keyword, page, size }
+     */
+    getNewsList(params) {
+        if (USE_MOCK) return mockApi.getNewsList(params)
+        return request('/news/list', {
+            method: 'GET',
+            data: params
+        })
+    },
+
+    // ==========================================
+    // 2.4 报告管理 (Report)
+    // ==========================================
+
+    /**
+     * 获取指定任务下的报告历史列表
+     * @param {Object} params { userId, taskId, page, size }
+     */
+    getReportList(params) {
+        if (USE_MOCK) return mockApi.getReportList(params)
+        return request('/report/list', {
+            method: 'GET',
+            data: params
+        })
+    },
+
+    /**
+     * 获取单份报告详情
+     * @param {String} id reportId
+     */
+    getReportDetail(id) {
+        if (USE_MOCK) return mockApi.getReportDetail(id)
+        return request(`/report/${id}`, {
+            method: 'GET'
+        })
+    },
+
+    /**
+     * 删除报告
+     * @param {String} id reportId
+     */
+    deleteReport(id) {
+        if (USE_MOCK) return mockApi.deleteReport(id)
+        return request(`/report/${id}`, {
+            method: 'DELETE'
+        })
+    },
+
+    // ==========================================
+    // 2.5 AI 智能问答 (AI Q&A)
+    // ==========================================
+
+    /**
+     * 基于报告问答
+     * @param {Object} data { question, reportId }
+     */
+    askReport(data) {
+        if (USE_MOCK) return mockApi.askReport(data)
+        return request('/qa/ask/report', {
+            method: 'POST',
+            data
+        })
+    },
+
+    /**
+     * 基于事件链分析问答
+     * @param {Object} data { question, eventId }
+     */
+    askEvent(data) {
+        if (USE_MOCK) return mockApi.askEvent(data)
+        return request('/qa/ask/event', {
+            method: 'POST',
+            data
         })
     }
 }
