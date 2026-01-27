@@ -5,7 +5,7 @@
       <div class="header-left">
         <div class="status-pill" @click="goToUserCenter">
           <van-icon name="user-circle-o" />
-          <span>{{ currentRole }}</span>
+          <span>{{ currentUserDisplay }}</span>
         </div>
       </div>
       <div class="header-center">
@@ -17,7 +17,7 @@
         </div>
       </div>
       <div class="header-right">
-        <van-icon name="ellipsis" size="24" @click="goToUserCenter" />
+        <!-- <van-icon name="ellipsis" size="24" @click="goToUserCenter" /> -->
       </div>
     </header>
 
@@ -25,7 +25,7 @@
     <UserProfile v-if="activeTab === 'mine'" />
 
     <!-- Widget Cards (Stats) -->
-    <div class="widget-scroll-container" v-if="activeTab === 'overview'">
+    <div class="widget-scroll-container animate-fade-in" v-if="activeTab === 'overview'">
       <div class="widget-card purple">
         <div class="widget-icon-circle"><van-icon name="fire-o" size="24" /></div>
         <div class="widget-text">
@@ -45,7 +45,7 @@
     <!-- Main Content Sections -->
     <div class="task-sections">
       <!-- Tab 1: Monitor (Analysis Flow) -->
-      <div v-show="activeTab === 'monitor'">
+      <div v-if="activeTab === 'monitor'" class="animate-fade-in">
           <div class="section-header mb-3">
               <van-icon name="aim" class="mr-2" />
               <span class="section-title">新词监测 (Analysis)</span>
@@ -87,7 +87,7 @@
 
       <!-- Tab 1 (Overview) & Tab 2 (Reports): Report List -->
       <div v-show="activeTab === 'overview' || activeTab === 'monitor'">
-          <div v-if="activeTab !== 'monitor'" class="section-header mb-3 mt-4">
+          <div v-if="activeTab !== 'monitor'" class="section-header mb-3 mt-4 animate-fade-in">
               <van-icon name="orders-o" class="mr-2" />
               <span class="section-title">趋势报告 (Reports)</span>
               <span class="count-badge">({{ list.length }})</span>
@@ -148,7 +148,15 @@
     </van-popup>
 
     <!-- Bottom Tabbar -->
-    <van-tabbar v-model="activeTab" active-color="#000" inactive-color="#999" :border="false" class="custom-tabbar" fixed placeholder>
+    <van-tabbar 
+      v-model="activeTab" 
+      active-color="#000" 
+      inactive-color="#ccc" 
+      :border="false" 
+      class="custom-tabbar" 
+      fixed
+      safe-area-inset-bottom
+    >
       <van-tabbar-item icon="apps-o" name="overview">概览</van-tabbar-item>
       <van-tabbar-item icon="search" name="monitor">监测</van-tabbar-item>
       <van-tabbar-item icon="comment-o" badge="5" name="msg">消息</van-tabbar-item>
@@ -168,7 +176,7 @@ const router = useRouter()
 
 // UI States
 const activeNames = ref(['monitor', 'reports'])
-const activeTab = ref('monitor')
+const activeTab = ref('overview')
 const isScrolled = ref(false)
 
 const handleScroll = () => {
@@ -211,7 +219,7 @@ const getFormattedDate = () => {
 }
 
 const currentDateStr = ref(getFormattedDate())
-const currentRole = ref('Admin')
+const currentUserDisplay = ref(localStorage.getItem('userName') || localStorage.getItem('userRole') || 'Admin')
 
 // Business States
 const keyword = ref('')
@@ -306,15 +314,13 @@ const goToUserCenter = () => {
 onMounted(() => {
     window.addEventListener('scroll', handleScroll)
     initObserver()
-    const role = localStorage.getItem('role')
-    if (role) currentRole.value = role.charAt(0).toUpperCase() + role.slice(1)
 })
 </script>
 
 <style scoped>
 .tiimo-dashboard {
   padding: 24px 20px 0 20px;
-  background-color: #f8f9fa; /* Slightly off-white background for better spacing perception */
+  background-color: #ffffff;
   min-height: 100vh;
   font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Segoe UI, Arial, Roboto, 'PingFang SC', 'miui', 'Hiragino Sans GB', 'Microsoft Yahei', sans-serif;
 }
@@ -384,12 +390,30 @@ onMounted(() => {
 .full-date { font-size: 12px; color: #666; margin-top: 2px; }
 .ml-2 { margin-left: 16px; }
 
+/* Animations */
+.animate-fade-in {
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Widgets */
 .widget-scroll-container {
   display: flex;
   overflow-x: auto;
   gap: 16px;
   padding-bottom: 24px;
+  padding: 4px; /* Added padding to prevent shadow clipping */
+  margin-bottom: 24px;
   -ms-overflow-style: none; scrollbar-width: none;
 }
 .widget-scroll-container::-webkit-scrollbar { display: none; }
@@ -397,30 +421,59 @@ onMounted(() => {
 .widget-card {
   flex: 1;
   min-width: 45%; 
-  height: 130px;
-  border-radius: 24px;
-  padding: 20px;
+  height: 140px;
+  border-radius: 28px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
+  justify-content: space-between;
+  align-items: flex-start; /* Left align content */
+  text-align: left;
   box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+  background-color: #fff; /* Fallback */
+  transition: transform 0.2s;
 }
-.widget-card.purple { background-color: #F3E5F5; }
-.widget-card.yellow { background-color: #F0F4C3; }
-.widget-card.blue { background-color: #E3F2FD; }
+.widget-card:active {
+  transform: scale(0.98);
+}
+
+.widget-card.purple { 
+    background: linear-gradient(135deg, #fdfbfd 0%, #f3e5f5 100%);
+    border: 1px solid rgba(243, 229, 245, 0.5);
+}
+.widget-card.purple .widget-icon-circle {
+    background-color: #ede7f6;
+    color: #7e57c2;
+}
+.widget-card.purple .stat-num { color: #512da8; }
+
+.widget-card.blue { 
+    background: linear-gradient(135deg, #fbfdff 0%, #e3f2fd 100%);
+    border: 1px solid rgba(227, 242, 253, 0.5);
+}
+.widget-card.blue .widget-icon-circle {
+    background-color: #e1f5fe;
+    color: #039be5;
+}
+.widget-card.blue .stat-num { color: #0277bd; }
 
 .widget-icon-circle {
-  width: 48px; height: 48px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.4);
+  width: 44px; height: 44px;
+  border-radius: 14px; /* Rounded square shapes */
   display: flex; justify-content: center; align-items: center;
-  margin-bottom: 12px; color: #333;
+  margin-bottom: 0px; 
 }
-.stat-num { font-size: 28px; font-weight: 700; line-height: 1.2; }
+
+.widget-text {
+    width: 100%;
+}
+
+.stat-num { font-size: 32px; font-weight: 800; line-height: 1.1; margin-bottom: 2px; }
 .text-risk { color: #d32f2f; }
-.stat-label { font-size: 13px; color: #666; margin-top: 4px; }
+.stat-label { font-size: 14px; color: #666; font-weight: 500;}
 
 /* Sections */
 .task-sections { margin-top: 24px; padding-bottom: 90px;}
@@ -440,9 +493,10 @@ onMounted(() => {
 /* Custom Card inside Collapse */
 .custom-card-content {
     background: #fff;
-    border-radius: 20px;
+    border-radius: 24px;
     padding: 24px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+    border: 1px solid rgba(0,0,0,0.03);
 }
 .custom-field {
     background: #f7f8fa;
@@ -453,8 +507,15 @@ onMounted(() => {
 .action-btn {
     border-radius: 16px;
     font-weight: 600;
-    height: 48px;
+    height: 52px;
     font-size: 16px;
+    background: linear-gradient(to right, #242424, #1a1a1a);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    border: none;
+    transition: transform 0.2s;
+}
+.action-btn:active {
+    transform: scale(0.98);
 }
 
 /* List Items */
@@ -494,7 +555,28 @@ onMounted(() => {
 .report-arrow { margin-left: 8px;}
 
 /* Tabbar */
-.custom-tabbar {
-  /* box-shadow: 0 -2px 10px rgba(0,0,0,0.05); */
+:deep(.custom-tabbar) {
+    margin: 0 24px 24px;
+    width: auto !important;
+    left: 0;
+    right: 0;
+    border-radius: 32px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    height: 64px;
+    /* Glassmorphism / Frosted glass effect */
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px);
+}
+
+:deep(.van-tabbar-item) {
+    background: transparent;
+    transition: all 0.3s;
+    border-radius: 24px;
+    margin: 6px;
+}
+
+:deep(.van-tabbar-item--active) {
+    background-color: #f0f0f0;
+    font-weight: 600;
 }
 </style>
