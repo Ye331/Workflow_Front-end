@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import Dashboard from '../views/Dashboard.vue'
 import ReportDetail from '../views/ReportDetail.vue'
+import MonitorDetail from '../views/MonitorDetail.vue'
 import UserManagement from '../views/UserManagement.vue'
 import Login from '../views/Login.vue'
 
@@ -23,6 +24,11 @@ const routes = [
         path: '/report/:id',
         name: 'ReportDetail',
         component: ReportDetail
+    },
+    {
+        path: '/monitor/:taskId',
+        name: 'MonitorDetail',
+        component: MonitorDetail
     },
     {
         path: '/user-management',

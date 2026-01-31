@@ -2,7 +2,7 @@ import { request } from '@/utils/request'
 import mockApi from './mock'
 
 // 开关：是否使用模拟数据（在开发阶段未对接后端时开启）
-const USE_MOCK = false
+const USE_MOCK = true
 
 /**
  * 中台调度层接口 (Python Middleware)

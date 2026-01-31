@@ -85,16 +85,45 @@
           </div>
       </div>
 
-      <!-- Tab 1 (Overview) & Tab 2 (Reports): Report List -->
-      <div v-show="activeTab === 'overview' || activeTab === 'monitor'">
-          <div v-if="activeTab !== 'monitor'" class="section-header mb-3 mt-4 animate-fade-in">
+      <!-- Monitor List: Tasks -->
+      <div v-if="activeTab === 'monitor'">
+          <div class="section-header mb-3 mt-4">
+               <van-icon name="clock-o" class="mr-2" />
+               <span class="section-title">监测任务列表</span>
+          </div>
+          
+          <div class="report-list-container">
+             <div class="monitor-task-list">
+                <div 
+                    v-for="task in taskList"
+                    :key="task.taskId"
+                    class="report-item"
+                    @click="goToMonitorDetail(task.taskId)"
+                >
+                   <div class="report-icon">
+                      <van-icon name="aim" color="#1989fa" size="24" />
+                   </div>
+                   <div class="report-info">
+                      <div class="report-title">{{ task.keywords.join(', ') }}</div>
+                      <div class="report-meta">
+                        ID: {{ task.taskId }} | 状态: {{ task.status }} | 创建: {{ task.created_at }}
+                      </div>
+                   </div>
+                   <div class="report-arrow">
+                      <van-icon name="arrow" color="#ccc" />
+                   </div>
+                </div>
+                <van-empty v-if="taskList.length === 0" description="暂无监测任务" />
+             </div>
+          </div>
+      </div>
+
+      <!-- Overview List: Reports -->
+      <div v-if="activeTab === 'overview'">
+          <div class="section-header mb-3 mt-4 animate-fade-in">
               <van-icon name="orders-o" class="mr-2" />
               <span class="section-title">趋势报告 (Reports)</span>
               <span class="count-badge">({{ list.length }})</span>
-          </div>
-          <div v-if="activeTab === 'monitor'" class="section-header mb-3 mt-4">
-               <van-icon name="clock-o" class="mr-2" />
-               <span class="section-title">近期记录</span>
           </div>
           
           <div class="report-list-container">
@@ -240,6 +269,8 @@ const loading = ref(false)
 const listLoading = ref(false)
 const finished = ref(false)
 const list = ref([])
+const taskList = ref([])
+const currentTaskId = ref('') // Added for task context
 
 watch(list, () => {
     nextTick(() => {
@@ -274,13 +305,17 @@ const handleTriggerAnalysis = async () => {
   
   loading.value = true
   try {
-    await middlewareApi.createTask({
+    const res = await middlewareApi.createTask({
       userId: localStorage.getItem('userId') || '1',
       keywords: [keyword.value],
       time_range: timeRange.value,
       interval: '1h'
     })
+    if (res && res.taskId) {
+        currentTaskId.value = res.taskId
+    }
     showToast({ type: 'success', message: '任务已下发' })
+    fetchDashboardStats()
     list.value = []
     finished.value = false
     listLoading.value = true
@@ -293,9 +328,14 @@ const handleTriggerAnalysis = async () => {
 }
 
 const onLoad = async () => {
+  if (!currentTaskId.value) {
+      listLoading.value = false
+      return
+  }
   try {
     const res = await middlewareApi.getAnalysisSlices({
         userId: localStorage.getItem('userId') || '1',
+        taskId: currentTaskId.value, // Pass taskId
         page: 1, 
         size: 20
     })
@@ -315,6 +355,10 @@ const onLoad = async () => {
 
 const goToReport = (id) => {
   router.push(`/report/${id}`)
+}
+
+const goToMonitorDetail = (taskId) => {
+  router.push(`/monitor/${taskId}`)
 }
 
 const scrollToTop = () => {
@@ -339,12 +383,26 @@ const fetchDashboardStats = async () => {
         } else if (taskRes && taskRes.list) {
              monitoringCount.value = taskRes.list.length
         }
+
+        if (taskRes && taskRes.list) {
+            taskList.value = taskRes.list
+        }
+        
+        // Auto-select latest task to fix missing taskId error
+        if (taskRes && taskRes.list && taskRes.list.length > 0) {
+            currentTaskId.value = taskRes.list[0].taskId
+            // Retrigger load if needed
+            if (list.value.length === 0) {
+                onLoad()
+            }
+        }
     } catch (e) {
         console.error("Failed to fetch task stats", e)
     }
 
     // 2. Fetch Reports for "Today's Report"
     try {
+        // Fetch all reports to calculate total today count accurately
         const reportRes = await middlewareApi.getReportList({ userId, page: 1, size: 100 })
         if (reportRes && reportRes.list) {
             const today = new Date().toDateString()
