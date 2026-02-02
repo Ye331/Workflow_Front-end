@@ -2,7 +2,7 @@ import { request } from '@/utils/request'
 import mockApi from './mock'
 
 // 开关：是否使用模拟数据（在开发阶段未对接后端时开启）
-const USE_MOCK = true
+const USE_MOCK = false
 
 /**
  * 中台调度层接口 (Python Middleware)
@@ -105,10 +105,11 @@ export default {
         }
 
         const payload = {
+            userId: data.userId, // Add userId
             keywords: data.keywords,
             startTime: format(startTime),
             endTime: format(now),
-            interval: 60 // Default fixed for now, or map data.interval '1h' -> 60
+            interval: data.interval ? parseInt(data.interval) : 60 // Use provided interval or default 60
         }
 
         return request('/task/create', {
@@ -136,9 +137,38 @@ export default {
      */
     updateTask(taskId, data) {
         if (USE_MOCK) return mockApi.updateTask(taskId, data)
+
+        const payload = { ...data } // Copy original data
+
+        // If time_range is provided, convert to startTime/endTime
+        if (data.time_range) {
+            const now = new Date();
+            let startTime = new Date();
+
+            if (data.time_range === '7d') {
+                startTime.setDate(now.getDate() - 7);
+            } else if (data.time_range === '30d') {
+                startTime.setDate(now.getDate() - 30);
+            } else {
+                startTime.setHours(now.getHours() - 24);
+            }
+
+            const format = (d) => {
+                const pad = (n) => n.toString().padStart(2, '0');
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+            }
+
+            payload.startTime = format(startTime);
+            payload.endTime = format(now);
+            delete payload.time_range; // Remove client-side field
+        }
+
+        // Map interval
+        if (payload.interval === '1h') payload.interval = 60;
+
         return request(`/task/${taskId}/update`, {
             method: 'POST',
-            data
+            data: payload
         })
     },
 

@@ -71,6 +71,17 @@
                     @click="showPicker = true"
                     class="custom-field"
                 />
+                <van-field
+                    v-model="intervalDisplayName"
+                    is-link
+                    readonly
+                    name="picker"
+                    label="生成频率"
+                    left-icon="replay"
+                    placeholder="选择报告生成间隔"
+                    @click="showIntervalPicker = true"
+                    class="custom-field"
+                />
              </van-cell-group>
              <van-button 
                 type="primary" 
@@ -96,9 +107,9 @@
              <div class="monitor-task-list">
                 <div 
                     v-for="task in taskList"
-                    :key="task.taskId"
+                    :key="task.taskId || task.id"
                     class="report-item"
-                    @click="goToMonitorDetail(task.taskId)"
+                    @click="goToMonitorDetail(task.taskId || task.id)"
                 >
                    <div class="report-icon">
                       <van-icon name="aim" color="#1989fa" size="24" />
@@ -106,7 +117,8 @@
                    <div class="report-info">
                       <div class="report-title">{{ task.keywords.join(', ') }}</div>
                       <div class="report-meta">
-                        ID: {{ task.taskId }} | 状态: {{ task.status }} | 创建: {{ task.created_at }}
+                        <div>ID: {{ task.taskId || task.id }} | 状态: {{ formatStatus(task.status) }}</div>
+                        <div style="margin-top: 4px;">创建: {{ formatTimeStr(task.createTime || task.created_at) }}</div>
                       </div>
                    </div>
                    <div class="report-arrow">
@@ -142,15 +154,15 @@
                 >
                    <div class="report-icon">
                       <van-icon 
-                        :name="item.sentiment === 'negative' ? 'warn-o' : (item.sentiment === 'positive' ? 'smile-o' : 'info-o')" 
-                        :color="item.sentiment === 'negative' ? '#ff605e' : (item.sentiment === 'positive' ? '#4caf50' : '#1989fa')" 
+                        :name="(item.sentiment === 'NEGATIVE' || item.sentiment === 'negative') ? 'warn-o' : ((item.sentiment === 'POSITIVE' || item.sentiment === 'positive') ? 'smile-o' : 'info-o')" 
+                        :color="(item.sentiment === 'NEGATIVE' || item.sentiment === 'negative') ? '#ff605e' : ((item.sentiment === 'POSITIVE' || item.sentiment === 'positive') ? '#4caf50' : '#1989fa')" 
                         size="24" 
                       />
                    </div>
                    <div class="report-info">
                       <div class="report-title">{{ item.title }}</div>
                       <div class="report-meta">
-                        热度: {{ item.heat }} % | 状态: {{ item.status }}
+                        {{ formatDate(item.createTime) }}
                       </div>
                    </div>
                    <div class="report-arrow">
@@ -173,6 +185,14 @@
           :columns="timeOptions"
           @confirm="onConfirmTime"
           @cancel="showPicker = false"
+        />
+    </van-popup>
+
+    <van-popup v-model:show="showIntervalPicker" position="bottom" round>
+        <van-picker
+          :columns="intervalOptions"
+          @confirm="onConfirmInterval"
+          @cancel="showIntervalPicker = false"
         />
     </van-popup>
 
@@ -222,17 +242,11 @@ const handleScroll = () => {
     isScrolled.value = window.scrollY > 20
 }
 
-onMounted(() => {
-    window.addEventListener('scroll', handleScroll)
-})
 
-onUnmounted(() => {
-    window.removeEventListener('scroll', handleScroll)
-    if (itemObserver) itemObserver.disconnect()
-})
 
 // Scroll Reveal Logic
 let itemObserver = null
+let statsTimer = null
 
 const initObserver = () => {
     itemObserver = new IntersectionObserver((entries) => {
@@ -246,6 +260,22 @@ const initObserver = () => {
     }, { threshold: 0.1, rootMargin: '0px' })
 }
 
+onMounted(() => {
+    window.addEventListener('scroll', handleScroll)
+    initObserver()
+    fetchDashboardStats()
+    // Auto refresh stats every 30 seconds
+    statsTimer = setInterval(fetchDashboardStats, 30000)
+    // Also try to refresh the list if we are at the top and not loading? 
+    // Maybe too intrusive. Let's just stick to stats for now.
+})
+
+onUnmounted(() => {
+    if (statsTimer) clearInterval(statsTimer)
+    window.removeEventListener('scroll', handleScroll)
+    if (itemObserver) itemObserver.disconnect()
+})
+
 
 const getFormattedDate = () => {
   const date = new Date()
@@ -257,6 +287,27 @@ const getFormattedDate = () => {
   return `${year}年${month}月${day}日 ${weekDay}`
 }
 
+const formatDate = (dateStr) => {
+  if (!dateStr) return '-'
+  try {
+     const d = new Date(dateStr)
+     const pad = (n) => n.toString().padStart(2, '0')
+     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  } catch(e) {
+     return dateStr
+  }
+}
+
+const formatTimeStr = (dateStr) => {
+  if (!dateStr) return '-'
+  return String(dateStr).replace('T', ' ')
+}
+
+const formatStatus = (status) => {
+  if (status === 1 || status === '1') return '启用'
+  if (status === 0 || status === '0') return '停用'
+}
+
 const currentDateStr = ref(getFormattedDate())
 const currentUserDisplay = ref(localStorage.getItem('userName') || localStorage.getItem('userRole') || 'Admin')
 
@@ -264,7 +315,10 @@ const currentUserDisplay = ref(localStorage.getItem('userName') || localStorage.
 const keyword = ref('')
 const timeRange = ref('24h')
 const timeDisplayName = ref('最近24小时')
+const interval = ref(60)
+const intervalDisplayName = ref('1小时')
 const showPicker = ref(false)
+const showIntervalPicker = ref(false)
 const loading = ref(false)
 const listLoading = ref(false)
 const finished = ref(false)
@@ -293,11 +347,25 @@ const timeOptions = [
   { text: '最近30天', value: '30d' },
 ]
 
+const intervalOptions = [
+  { text: '2分钟(测试)', value: 2 },
+  { text: '1小时', value: 60 },
+  { text: '6小时', value: 360 },
+  { text: '12小时', value: 720 },
+  { text: '24小时', value: 1440 },
+]
+
 // Methods
 const onConfirmTime = ({ selectedOptions }) => {
   timeRange.value = selectedOptions[0].value
   timeDisplayName.value = selectedOptions[0].text
   showPicker.value = false
+}
+
+const onConfirmInterval = ({ selectedOptions }) => {
+  interval.value = selectedOptions[0].value
+  intervalDisplayName.value = selectedOptions[0].text
+  showIntervalPicker.value = false
 }
 
 const handleTriggerAnalysis = async () => {
@@ -309,10 +377,10 @@ const handleTriggerAnalysis = async () => {
       userId: localStorage.getItem('userId') || '1',
       keywords: [keyword.value],
       time_range: timeRange.value,
-      interval: '1h'
+      interval: interval.value
     })
-    if (res && res.taskId) {
-        currentTaskId.value = res.taskId
+    if (res && (res.taskId || res.id)) {
+        currentTaskId.value = res.taskId || res.id
     }
     showToast({ type: 'success', message: '任务已下发' })
     fetchDashboardStats()
@@ -328,24 +396,62 @@ const handleTriggerAnalysis = async () => {
 }
 
 const onLoad = async () => {
-  if (!currentTaskId.value) {
-      listLoading.value = false
-      return
-  }
   try {
-    const res = await middlewareApi.getAnalysisSlices({
-        userId: localStorage.getItem('userId') || '1',
-        taskId: currentTaskId.value, // Pass taskId
-        page: 1, 
-        size: 20
+    const userId = localStorage.getItem('userId') || '1'
+    
+    // 1. Fetch all tasks for the user first
+    const taskRes = await middlewareApi.getTaskList({ userId, page: 1, size: 100 })
+    const tasks = taskRes.list || []
+
+    if (tasks.length === 0) {
+        list.value = []
+        listLoading.value = false
+        finished.value = true
+        return
+    }
+
+    // 2. Fetch reports for each task
+    // We fetch reports for all tasks to show a comprehensive timeline
+    const reportPromises = tasks.map(task => 
+        middlewareApi.getReportList({ 
+            taskId: task.taskId || task.id, 
+            userId: userId, // Pass userId just in case
+            page: 1, 
+            size: 20 
+        }).catch(() => null) 
+    )
+
+    const results = await Promise.all(reportPromises)
+    let aggregatedReports = []
+
+    results.forEach(res => {
+        if (res && res.list) {
+            aggregatedReports = aggregatedReports.concat(res.list)
+        }
     })
-    if (res && res.list) {
-        // Mock data enhancement if needed
-        list.value = res.list
+
+    // 3. Sort by createTime descending
+    aggregatedReports.sort((a, b) => {
+        const timeA = new Date(a.createTime || a.created_at || 0).getTime()
+        const timeB = new Date(b.createTime || b.created_at || 0).getTime()
+        return timeB - timeA
+    })
+    
+    if (aggregatedReports.length > 0) {
+        list.value = aggregatedReports.map(item => ({
+            ...item,
+            id: item.id || item.reportId,
+            title: item.name || item.reportName,
+            status: item.status,
+            heat: 0, 
+            sentiment: 'neutral',
+            createTime: item.createTime || item.created_at
+        }))
     } else {
         list.value = []
     }
   } catch (err) {
+    console.error(err)
     // showToast('数据加载失败')
   } finally {
     listLoading.value = false
@@ -378,51 +484,58 @@ const fetchDashboardStats = async () => {
     // 1. Fetch Tasks for "Currently Monitoring"
     try {
         const taskRes = await middlewareApi.getTaskList({ userId, page: 1, size: 100 })
+        let allTasks = []
         if (taskRes && taskRes.total !== undefined) {
              monitoringCount.value = taskRes.total
+             allTasks = taskRes.list || []
         } else if (taskRes && taskRes.list) {
              monitoringCount.value = taskRes.list.length
+             allTasks = taskRes.list
         }
 
         if (taskRes && taskRes.list) {
             taskList.value = taskRes.list
         }
         
-        // Auto-select latest task to fix missing taskId error
-        if (taskRes && taskRes.list && taskRes.list.length > 0) {
-            currentTaskId.value = taskRes.list[0].taskId
-            // Retrigger load if needed
-            if (list.value.length === 0) {
-                onLoad()
-            }
-        }
-    } catch (e) {
-        console.error("Failed to fetch task stats", e)
-    }
-
-    // 2. Fetch Reports for "Today's Report"
-    try {
-        // Fetch all reports to calculate total today count accurately
-        const reportRes = await middlewareApi.getReportList({ userId, page: 1, size: 100 })
-        if (reportRes && reportRes.list) {
+        // 2. Fetch Reports for "Today's Report" - Aggregate from ALL tasks
+        if (allTasks.length > 0) {
             const today = new Date().toDateString()
-            const todayCount = reportRes.list.filter(item => {
-                if (!item.createTime) return false
-                const itemDate = new Date(item.createTime).toDateString()
-                return itemDate === today
-            }).length
-            todayReportCount.value = todayCount
+            
+            // We fetch reasonable amount of recent reports to calculate "Today" count across all tasks
+            const reportPromises = allTasks.map(task => 
+                middlewareApi.getReportList({ 
+                    taskId: task.taskId || task.id, 
+                    userId, 
+                    page: 1, 
+                    size: 50 
+                }).catch(() => ({ list: [] }))
+            )
+            
+            const results = await Promise.all(reportPromises)
+            let totalToday = 0
+            
+            results.forEach(res => {
+                if (res && res.list) {
+                    const count = res.list.filter(item => {
+                        if (!item.createTime && !item.created_at) return false
+                        const t = item.createTime || item.created_at
+                        const itemDate = new Date(t).toDateString()
+                        return itemDate === today
+                    }).length
+                    totalToday += count
+                }
+            })
+            
+            todayReportCount.value = totalToday
+        } else {
+             todayReportCount.value = 0
         }
     } catch (e) {
-        console.error("Failed to fetch report stats", e)
+        console.error("Failed to fetch dashboard stats", e)
     }
 }
 
-onMounted(() => {
-    window.addEventListener('scroll', handleScroll)
-    initObserver()
-    fetchDashboardStats()
-})
+
 </script>
 
 <style scoped>

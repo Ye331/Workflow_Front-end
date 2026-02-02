@@ -208,12 +208,19 @@ const fetchReport = async (id) => {
   loading.value = true
   try {
     const res = await middlewareApi.getReportDetail(id)
+    
+    // Fix potential Mermaid render error caused by empty x-axis
+    let content = res.summary || ''
+    // Replace x-axis [""] with x-axis ["无数据"] or similar to avoid parser error
+    content = content.replace(/x-axis\s*\[""\]/g, 'x-axis ["无数据"]')
+
     reportData.value = {
-        summary: res.summary,
+        summary: content,
         title: res.reportName || '未知舆情报告', 
         createTime: res.createTime || new Date().toISOString(),
     }
   } catch (err) {
+    console.error(err)
     showToast('获取报告失败')
   } finally {
     loading.value = false
