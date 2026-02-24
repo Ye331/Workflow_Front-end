@@ -11,7 +11,7 @@
     <!-- 加载中 -->
     <div v-if="loading" class="loading-box">
       <div class="loading-content">
-        <van-loading color="#1989fa" size="36px" vertical>AI 正在深度分析 (WF2)...</van-loading>
+        <van-loading color="#1989fa" size="36px" vertical>AI 正在深度分析中...</van-loading>
         <div class="loading-tips">这可能需要几秒钟时间</div>
       </div>
     </div>
@@ -43,7 +43,7 @@
       <div class="report-body-card">
         <div class="card-header">
             <van-icon name="description" color="#1989fa" size="18" />
-            <span class="title-text">智能综述 (Summary)</span>
+            <span class="title-text">智能综述</span>
         </div>
         <div class="markdown-body" v-html="renderedMarkdown"></div>
       </div>
@@ -59,7 +59,7 @@
         <div class="qa-header-row">
             <div class="qa-title">
                 <van-icon name="chat-o" size="18" />
-                <span>AI 助手 (RAG)</span>
+                <span>AI 助手</span>
             </div>
             <div class="qa-status">在线</div>
         </div>
